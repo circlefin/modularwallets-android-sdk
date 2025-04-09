@@ -27,6 +27,13 @@ enum class Token {
     Arbitrum_USDC,
     Arbitrum_ARB,
     ArbitrumSepolia_USDC,
+    Base_USDC,
+    BaseSepolia_USDC,
+    Optimism_USDC,
+    Optimism_OP,
+    OptimismSepolia_USDC,
     Polygon_USDC,
-    PolygonAmoy_USDC;
+    PolygonAmoy_USDC,
+    Unichain_USDC,
+    UnichainSepolia_USDC;
 }

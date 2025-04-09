@@ -18,9 +18,16 @@
 
 package com.circle.modularwallets.core.apis.modular
 
+import com.circle.modularwallets.core.errors.BaseError
+import com.circle.modularwallets.core.models.AddressMappingOwner
+import com.circle.modularwallets.core.models.CreateAddressMappingResult
+import com.circle.modularwallets.core.models.EoaAddressMappingOwner
+import com.circle.modularwallets.core.models.WebAuthnAddressMappingOwner
 import com.circle.modularwallets.core.transports.RpcRequest
 import com.circle.modularwallets.core.transports.Transport
+import com.circle.modularwallets.core.utils.abi.isAddress
 import com.circle.modularwallets.core.utils.rpc.performJsonRpcRequest
+import com.circle.modularwallets.core.utils.rpc.resultToTypeAndJson
 
 internal object ModularApiImpl : ModularApi {
     override suspend fun getAddress(
@@ -30,6 +37,48 @@ internal object ModularApiImpl : ModularApi {
         val req = RpcRequest("circle_getAddress", listOf(getAddressReq))
         val result = performJsonRpcRequest(transport, req, ModularWallet::class.java)
         return result.first
+    }
+
+    override suspend fun createAddressMapping(
+        transport: Transport,
+        walletAddress: String,
+        owners: Array<AddressMappingOwner>
+    ): Array<CreateAddressMappingResult> {
+        if (!isAddress(walletAddress)) {
+            throw BaseError("walletAddress is invalid")
+        }
+        if (owners.isEmpty()) {
+            throw BaseError("At least one owner must be provided")
+        }
+        owners.forEachIndexed { index, owner ->
+            when (owner) {
+                is EoaAddressMappingOwner -> {
+                    if (!isAddress(owner.identifier.address)) {
+                        throw BaseError("EOA owner at index $index has an invalid address")
+                    }
+                }
+
+                is WebAuthnAddressMappingOwner -> {
+                    if (owner.identifier.publicKeyX.isBlank() || owner.identifier.publicKeyY.isBlank()) {
+                        throw BaseError("Webauthn owner at index $index must have publicKeyX and publicKeyY")
+                    }
+                }
+
+                else -> {
+                    throw BaseError("Owner at index $index has an invalid type")
+                }
+            }
+        }
+
+        val req = RpcRequest(
+            "circle_createAddressMapping",
+            listOf(CreateAddressMappingReq(walletAddress, owners))
+        )
+        val rawList = performJsonRpcRequest(transport, req) as ArrayList<*>
+        val result: Array<CreateAddressMappingResult> = rawList.mapNotNull { item ->
+            resultToTypeAndJson(item, CreateAddressMappingResult::class.java).first
+        }.toTypedArray()
+        return result
     }
 }
 

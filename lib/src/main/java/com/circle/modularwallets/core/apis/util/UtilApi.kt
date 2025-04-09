@@ -55,7 +55,13 @@ internal interface UtilApi {
         message: String,
         signature: String,
         from: String,
-        to: String = CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address
+        to: String
     ): Boolean
+
+    suspend fun getReplaySafeMessageHash(
+        transport: Transport,
+        account: String,
+        hash: String,
+    ): String
 
 }

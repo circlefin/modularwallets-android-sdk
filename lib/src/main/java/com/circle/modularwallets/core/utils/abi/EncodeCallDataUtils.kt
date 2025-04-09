@@ -55,7 +55,7 @@ internal fun encodeCallData(arg: EncodeCallDataArg): String {
     return FunctionEncoder.encode(function)
 }
 
-private fun isAddress(to: String): Boolean {
+internal fun isAddress(to: String): Boolean {
     val addressRegex = Regex("^0x[a-fA-F0-9]{40}$")
     return addressRegex.matches(to)
 }

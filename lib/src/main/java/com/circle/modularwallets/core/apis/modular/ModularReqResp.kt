@@ -20,6 +20,7 @@
 package com.circle.modularwallets.core.apis.modular
 
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
+import com.circle.modularwallets.core.models.AddressMappingOwner
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
@@ -39,7 +40,7 @@ data class ModularWallet(
     @Json(name = "state") val state: String? = null,
     @Json(name = "name") val name: String? = null,
     @Json(name = "scaConfiguration") val scaConfiguration: ScaConfiguration,
-){
+) {
     /**
      * Gets the initialization code from the SCA configuration.
      *
@@ -95,7 +96,6 @@ data class WebauthnOwner(
     @Json(name = "weight") val weight: Int,
 )
 
-
 internal fun getCreateWalletReq(
     publicKeyX: String,
     publicKeyY: String,
@@ -118,3 +118,9 @@ internal fun getCreateWalletReq(
         Metadata(name)
     )
 }
+
+@JsonClass(generateAdapter = true)
+internal data class CreateAddressMappingReq(
+    @Json(name = "walletAddress") val walletAddress: String,
+    @Json(name = "owners") val owners: Array<AddressMappingOwner>,
+)

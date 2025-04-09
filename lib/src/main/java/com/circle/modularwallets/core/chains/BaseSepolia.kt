@@ -16,18 +16,9 @@
  * limitations under the License.
  */
 
-package com.circle.modularwallets.core.apis.modular
+package com.circle.modularwallets.core.chains
 
-import com.circle.modularwallets.core.models.AddressMappingOwner
-import com.circle.modularwallets.core.models.CreateAddressMappingResult
-import com.circle.modularwallets.core.transports.Transport
-
-internal interface ModularApi {
-    suspend fun getAddress(transport: Transport, getAddressReq: GetAddressReq): ModularWallet
-    suspend fun createAddressMapping(
-        transport: Transport,
-        walletAddress: String,
-        owners: Array<AddressMappingOwner>
-    ): Array<CreateAddressMappingResult>
-
+object BaseSepolia : Chain() {
+    override val chainId: Long
+        get() = 84532
 }

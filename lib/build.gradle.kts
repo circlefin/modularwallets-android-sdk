@@ -15,8 +15,8 @@ plugins {
 
 extra.apply {
     set("versionMajor", 0)
-    set("versionMedium", 0)
-    set("versionMinorPublished", 204) // should increment after public release
+    set("versionMedium", 1)
+    set("versionMinorPublished", 0)
     set("libraryId", libraryId())
     set("libraryGroupId", libraryId())
     set("libraryArtifactId", libraryArtifactId())
@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.androidx.credentials.auth)
     implementation(libs.retrofit2.converter.moshi)
     implementation(libs.moshi.kotlin)
+    implementation(libs.moshi.adapters)
     implementation(libs.web3j)
     implementation(libs.retrofit2.retrofit)
     implementation(libs.retrofit2.converter.gson)

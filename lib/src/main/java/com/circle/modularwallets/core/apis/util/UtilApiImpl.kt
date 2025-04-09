@@ -25,6 +25,7 @@ import com.circle.modularwallets.core.errors.BaseError
 import com.circle.modularwallets.core.transports.RpcRequest
 import com.circle.modularwallets.core.transports.Transport
 import com.circle.modularwallets.core.utils.Logger
+import com.circle.modularwallets.core.utils.encoding.bytesToHex
 import com.circle.modularwallets.core.utils.encoding.hexToBigInteger
 import com.circle.modularwallets.core.utils.encoding.toSha3Bytes
 import com.circle.modularwallets.core.utils.rpc.performJsonRpcRequest
@@ -129,10 +130,54 @@ internal object UtilApiImpl : UtilApi {
                 object : TypeReference<Bytes4>() {})
         )
         val data = FunctionEncoder.encode(function)
-        Logger.d(msg = "isValidSignature > call")
+        Logger.d(
+            msg = """
+            isValidSignature > call
+            Message: $message
+            Digest: ${bytesToHex(digest)}
+            Signature: $signature
+            From: $from
+            To: $to
+        """.trimIndent()
+        )
         val resp = call(transport, from, to, data)
         val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
         return EIP1271_VALID_SIGNATURE.contentEquals(decoded[0].value as ByteArray)
+    }
+
+    override suspend fun getReplaySafeMessageHash(
+        transport: Transport,
+        account: String,
+        hash: String
+    ): String {
+        val byte32Hash: Bytes32
+        try {
+            byte32Hash = Bytes32(Numeric.hexStringToByteArray(hash))
+        } catch (e: UnsupportedOperationException) {
+            throw BaseError("Invalid hash: $hash")
+        }
+        val function = Function(
+            "getReplaySafeMessageHash",
+            listOf<Type<*>>(Address(account), byte32Hash),
+            listOf<TypeReference<*>>(
+                object : TypeReference<Bytes32>() {})
+        )
+        val data = FunctionEncoder.encode(function)
+        val resp = call(transport, account, account, data)
+        val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
+        if (decoded.isEmpty()) {
+            throw BaseError("Invalid account or empty response for: $account. Response: $resp")
+        }
+        val result = bytesToHex(decoded[0].value as ByteArray)
+        Logger.d(
+            msg = """
+            getReplaySafeMessageHash > call
+            Account: $account
+            Hash: $hash
+            Result: $result
+        """.trimIndent()
+        )
+        return result
     }
 }
 

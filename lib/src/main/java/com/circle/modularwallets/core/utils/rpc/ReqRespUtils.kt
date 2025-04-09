@@ -44,6 +44,10 @@ import com.circle.modularwallets.core.errors.UnauthorizedProviderError
 import com.circle.modularwallets.core.errors.UnknownRpcError
 import com.circle.modularwallets.core.errors.UnsupportedProviderMethodError
 import com.circle.modularwallets.core.errors.UserRejectedRequestError
+import com.circle.modularwallets.core.models.AddressMappingOwner
+import com.circle.modularwallets.core.models.EoaAddressMappingOwner
+import com.circle.modularwallets.core.models.OwnerIdentifierType
+import com.circle.modularwallets.core.models.WebAuthnAddressMappingOwner
 import com.circle.modularwallets.core.transports.HttpError
 import com.circle.modularwallets.core.transports.RpcRequest
 import com.circle.modularwallets.core.transports.RpcResponse
@@ -55,6 +59,7 @@ import com.squareup.moshi.FromJson
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.ToJson
+import com.squareup.moshi.adapters.PolymorphicJsonAdapterFactory
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.Interceptor
 import okhttp3.Request
@@ -64,9 +69,8 @@ import okio.Buffer
 import java.math.BigDecimal
 import java.math.BigInteger
 
-
 internal fun <T> resultToTypeAndJson(result: Any, type: Class<T>): Pair<T, String> {
-    val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    val moshi = getMoshi()
     val jsonAdapter = moshi.adapter(Map::class.java)
     val jsonString = jsonAdapter.toJson(result as Map<*, *>?)
     val adapter: JsonAdapter<T> = moshi.adapter(type)
@@ -120,7 +124,7 @@ internal suspend fun performJsonRpcRequest(
     val body = call.body()
     body?.error?.let {
         val req = call.raw().request
-        val rpcRequestError= RpcRequestError(
+        val rpcRequestError = RpcRequestError(
             getBodyString(req.body), it,
             url = req.url.toString()
         )
@@ -137,12 +141,24 @@ internal suspend fun performJsonRpcRequest(
     )
 }
 
-internal fun getMoshi(): Moshi {
-    return Moshi.Builder()
+private val moshiInstance: Moshi by lazy {
+    Moshi.Builder()
         .add(BigDecimalAdapter)
         .add(BigIntegerAdapter)
+        .add(
+            PolymorphicJsonAdapterFactory.of(AddressMappingOwner::class.java, "type")
+                .withSubtype(EoaAddressMappingOwner::class.java, OwnerIdentifierType.EOA.value)
+                .withSubtype(
+                    WebAuthnAddressMappingOwner::class.java,
+                    OwnerIdentifierType.WebAuthn.value
+                )
+        )
         .add(KotlinJsonAdapterFactory())
         .build()
+}
+
+internal fun getMoshi(): Moshi {
+    return moshiInstance
 }
 
 @ExcludeFromGeneratedCCReport
