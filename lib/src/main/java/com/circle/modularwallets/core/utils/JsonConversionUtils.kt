@@ -18,6 +18,7 @@
 
 package com.circle.modularwallets.core.utils
 
+import com.circle.modularwallets.core.utils.rpc.getMoshi
 import com.google.gson.Gson
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
@@ -33,7 +34,7 @@ internal fun toJson(obj: Any?): String {
 }
 
 internal fun <T> fromJson(jsonString: String, type: Class<T>): T? {
-    val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    val moshi = getMoshi()
     val adapter: JsonAdapter<T> = moshi.adapter(type)
     return adapter.fromJson(jsonString)
 }

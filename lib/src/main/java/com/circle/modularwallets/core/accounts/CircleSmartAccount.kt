@@ -286,9 +286,7 @@ class CircleSmartAccount(
     @Throws(Exception::class)
     override suspend fun sign(context: Context, hex: String): String {
         val digest = toSha3Bytes(hex)
-        val hash = getReplaySafeHash(
-            client.chain.chainId, getAddress(), bytesToHex(digest)
-        )
+        val hash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), bytesToHex(digest))
         val signResult = owner.sign(context, hash)
         val signature = encodePackedForSignature(
             signResult,
@@ -309,9 +307,7 @@ class CircleSmartAccount(
     @Throws(Exception::class)
     override suspend fun signMessage(context: Context, message: String): String {
         val digest = toSha3Bytes(hashMessage(message.toByteArray()))
-        val hash = getReplaySafeHash(
-            client.chain.chainId, getAddress(), bytesToHex(digest)
-        )
+        val hash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), bytesToHex(digest))
         val signResult = owner.sign(context, hash)
         val signature = encodePackedForSignature(
             signResult,
@@ -332,9 +328,7 @@ class CircleSmartAccount(
     @Throws(Exception::class)
     override suspend fun signTypedData(context: Context, typedData: String): String {
         val digest = toSha3Bytes(hashTypedData(typedData))
-        val hash = getReplaySafeHash(
-            client.chain.chainId, getAddress(), bytesToHex(digest)
-        )
+        val hash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), bytesToHex(digest))
         val signResult = owner.sign(context, hash)
         val signature = encodePackedForSignature(
             signResult,
@@ -378,64 +372,6 @@ class CircleSmartAccount(
         return wallet.getInitCode()
     }
 
-}
-
-internal fun getReplaySafeHash(
-    chainId: Long,
-    account: String,
-    hash: String,
-    verifyingContract: String = CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address,
-): String {
-    val prefix = Numeric.hexStringToByteArray(EIP712_PREFIX)
-    val domainSeparatorTypeHash =
-        toSha3Bytes(REPLAY_SAFE_HASH_V1.domainSeparatorType)
-
-    val domainSeparator = toSha3Bytes(
-        encodeAbiParameters(
-            listOf(
-                Bytes32(domainSeparatorTypeHash),
-                Bytes32(getModuleIdHash()),
-                Uint256(chainId),
-                Address(verifyingContract),
-                Bytes32(pad(toBytes(account), isRight = true)),
-            )
-        )
-    )
-
-    val structHash = toSha3Bytes(
-        encodeAbiParameters(
-            listOf(
-                Bytes32(getModuleTypeHash()),
-                Bytes32(Numeric.hexStringToByteArray(hash))
-            )
-        )
-    )
-    return bytesToHex(
-        Hash.sha3(
-            concat(
-                prefix,
-                domainSeparator,
-                structHash
-            )
-        )
-    )
-}
-
-internal fun getModuleIdHash(): ByteArray {
-    return toSha3Bytes(
-        encodePacked(
-            listOf<Type<*>>(
-                Utf8String(REPLAY_SAFE_HASH_V1.name),
-                Utf8String(REPLAY_SAFE_HASH_V1.version),
-            )
-        )
-    )
-}
-
-internal fun getModuleTypeHash(): ByteArray {
-    return toSha3Bytes(
-        REPLAY_SAFE_HASH_V1.moduleType
-    )
 }
 
 internal fun encodePackedForSignature(

@@ -25,12 +25,15 @@ import com.circle.modularwallets.core.apis.bundler.BundlerApi
 import com.circle.modularwallets.core.apis.bundler.BundlerApiImpl
 import com.circle.modularwallets.core.apis.bundler.toResult
 import com.circle.modularwallets.core.apis.bundler.toUserOperationReceipt
+import com.circle.modularwallets.core.apis.modular.ModularApiImpl
 import com.circle.modularwallets.core.apis.public.PublicApi
 import com.circle.modularwallets.core.apis.public.PublicApiImpl
 import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.chains.Chain
+import com.circle.modularwallets.core.models.AddressMappingOwner
 import com.circle.modularwallets.core.models.Block
+import com.circle.modularwallets.core.models.CreateAddressMappingResult
 import com.circle.modularwallets.core.models.EncodeCallDataArg
 import com.circle.modularwallets.core.models.EntryPoint
 import com.circle.modularwallets.core.models.EstimateFeesPerGasResult
@@ -387,5 +390,21 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
         blockTag: String = "latest"
     ): Block {
         return pubApi.getBlock(transport, includeTransactions, blockTag)
+    }
+
+    /**
+     * Creates an address mapping for recovery.
+     *
+     * @param walletAddress The Circle smart wallet address.
+     * @param owners The owners of the wallet.
+     * @return The response from adding an address mapping.
+     */
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun createAddressMapping(
+        walletAddress: String,
+        owners: Array<AddressMappingOwner>
+    ): Array<CreateAddressMappingResult> {
+        return ModularApiImpl.createAddressMapping(transport, walletAddress, owners)
     }
 }

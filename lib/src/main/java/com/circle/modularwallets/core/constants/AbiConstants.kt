@@ -27,8 +27,15 @@ internal val CONTRACT_ADDRESS: Map<String, String> = mapOf(
     Token.Arbitrum_USDC.name to "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
     Token.Arbitrum_ARB.name to "0x912CE59144191C1204E64559FE8253a0e49E6548",
     Token.ArbitrumSepolia_USDC.name to "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+    Token.Base_USDC.name to "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    Token.BaseSepolia_USDC.name to "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    Token.Optimism_USDC.name to "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    Token.Optimism_OP.name to "0x4200000000000000000000000000000000000042",
+    Token.OptimismSepolia_USDC.name to "0x5fd84259d66Cd46123540766Be93DFE6D43130D7",
     Token.Polygon_USDC.name to "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
     Token.PolygonAmoy_USDC.name to "0x41e94eb019c0762f9bfcf9fb1e58725bfb0e7582",
+    Token.Unichain_USDC.name to "0x078D782b760474a361dDA0AF3839290b0EF57AD6",
+    Token.UnichainSepolia_USDC.name to "0x31d0220469e10c4E71834a79b1f276d740d3768F",
 )
 val CIRCLE_PLUGIN_ADD_OWNERS_ABI = """
 [
