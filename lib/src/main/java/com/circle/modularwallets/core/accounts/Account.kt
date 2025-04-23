@@ -35,16 +35,16 @@ abstract class Account<T> {
     abstract fun getAddress(): String
 
     /**
-     * Signs the given hex data.
+     * Signs a given hash
      *
      * @param context The context in which the signing operation is performed.
-     * @param hex The hex data to sign.
+     * @param messageHash The hash to sign.
      * @return The signed data of type T.
      */
-    abstract suspend fun sign(context: Context, hex: String): T
+    abstract suspend fun sign(context: Context, messageHash: String): T
 
     /**
-     * Signs the given message.
+     * Signs a given message.
      *
      * @param context The context in which the signing operation is performed.
      * @param message The message to sign.
@@ -53,7 +53,7 @@ abstract class Account<T> {
     abstract suspend fun signMessage(context: Context, message: String): T
 
     /**
-     * Signs the given typed data.
+     * Signs a given typed data.
      *
      * @param context The context in which the signing operation is performed.
      * @param typedData The typed data to sign.

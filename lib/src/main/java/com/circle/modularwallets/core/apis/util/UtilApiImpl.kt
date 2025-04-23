@@ -27,7 +27,6 @@ import com.circle.modularwallets.core.transports.Transport
 import com.circle.modularwallets.core.utils.Logger
 import com.circle.modularwallets.core.utils.encoding.bytesToHex
 import com.circle.modularwallets.core.utils.encoding.hexToBigInteger
-import com.circle.modularwallets.core.utils.encoding.toSha3Bytes
 import com.circle.modularwallets.core.utils.rpc.performJsonRpcRequest
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.FunctionReturnDecoder
@@ -117,15 +116,17 @@ internal object UtilApiImpl : UtilApi {
     @ExcludeFromGeneratedCCReport
     override suspend fun isValidSignature(
         transport: Transport,
-        message: String,
+        digest: String,
         signature: String,
         from: String,
         to: String
     ): Boolean {
-        val digest = toSha3Bytes(message)
         val function = Function(
             "isValidSignature",
-            listOf<Type<*>>(Bytes32(digest), DynamicBytes(Numeric.hexStringToByteArray(signature))),
+            listOf<Type<*>>(
+                Bytes32(Numeric.hexStringToByteArray(digest)),
+                DynamicBytes(Numeric.hexStringToByteArray(signature))
+            ),
             listOf<TypeReference<*>>(
                 object : TypeReference<Bytes4>() {})
         )
@@ -133,8 +134,7 @@ internal object UtilApiImpl : UtilApi {
         Logger.d(
             msg = """
             isValidSignature > call
-            Message: $message
-            Digest: ${bytesToHex(digest)}
+            Digest: $digest
             Signature: $signature
             From: $from
             To: $to
@@ -142,6 +142,10 @@ internal object UtilApiImpl : UtilApi {
         )
         val resp = call(transport, from, to, data)
         val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
+        if (decoded.isEmpty()) {
+            Logger.w(msg = "Empty response from isValidSignature call")
+            return false
+        }
         return EIP1271_VALID_SIGNATURE.contentEquals(decoded[0].value as ByteArray)
     }
 
