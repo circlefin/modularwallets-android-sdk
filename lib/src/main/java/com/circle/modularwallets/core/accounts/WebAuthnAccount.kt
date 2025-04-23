@@ -60,17 +60,17 @@ open class WebAuthnAccount internal constructor(internal val credential: WebAuth
     }
 
     /**
-     * Signs the given hex data.
+     * Signs a given hash
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
-     * @param hex The hex data to sign.
+     * @param messageHash The hash to sign.
      * @return The result of the signing operation.
      * @throws BaseError if the credential request fails.
      */
     @ExcludeFromGeneratedCCReport
     @Throws(Exception::class)
-    override suspend fun sign(context: Context, hex: String): SignResult {
-        val optionsAndJson = getRequestOptions(credential.rpId, credential.id, hex)
+    override suspend fun sign(context: Context, messageHash: String): SignResult {
+        val optionsAndJson = getRequestOptions(credential.rpId, credential.id, messageHash)
         val authRespJson = getSavedCredentials(context, optionsAndJson.second)
         val authResp = fromJson(authRespJson, AuthenticationCredential::class.java)
             ?: throw BaseError("credential request failed. Get null from json\n${authRespJson}")
@@ -85,7 +85,7 @@ open class WebAuthnAccount internal constructor(internal val credential: WebAuth
     }
 
     /**
-     * Signs the given message.
+     * Signs a given message.
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
      * @param message The message to sign.
@@ -100,7 +100,7 @@ open class WebAuthnAccount internal constructor(internal val credential: WebAuth
     }
 
     /**
-     * Signs the given typed data.
+     * Signs a given typed data.
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
      * @param typedData The typed data to sign.

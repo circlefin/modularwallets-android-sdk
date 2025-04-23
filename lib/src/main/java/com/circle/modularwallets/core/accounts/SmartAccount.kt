@@ -79,16 +79,16 @@ abstract class SmartAccount(val client: Client, val entryPoint: EntryPoint) {
     abstract fun <T : UserOperation> getStubSignature(userOp: T): String
 
     /**
-     * Signs the given hex data.
+     * Signs a hash via the Smart Account's owner.
      *
      * @param context The context in which the signing operation is performed.
-     * @param hex The hex data to sign.
+     * @param messageHash The hash to sign.
      * @return The signed data.
      */
-    abstract suspend fun sign(context: Context, hex: String): String
+    abstract suspend fun sign(context: Context, messageHash: String): String
 
     /**
-     * Signs the given message.
+     * Signs a given message.
      *
      * @param context The context in which the signing operation is performed.
      * @param message The message to sign.
@@ -97,7 +97,7 @@ abstract class SmartAccount(val client: Client, val entryPoint: EntryPoint) {
     abstract suspend fun signMessage(context: Context, message: String): String
 
     /**
-     * Signs the given typed data.
+     * Signs a given typed data.
      *
      * @param context The context in which the signing operation is performed.
      * @param typedData The typed data to sign.
@@ -106,7 +106,7 @@ abstract class SmartAccount(val client: Client, val entryPoint: EntryPoint) {
     abstract suspend fun signTypedData(context: Context, typedData: String): String
 
     /**
-     * Signs the given user operation.
+     * Signs a given user operation.
      *
      * @param context The context in which the signing operation is performed.
      * @param chainId The chain ID for the user operation. Default is the chain ID of the client.

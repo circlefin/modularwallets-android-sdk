@@ -18,7 +18,6 @@
 
 package com.circle.modularwallets.core.apis.util
 
-import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
 import com.circle.modularwallets.core.transports.Transport
 import java.math.BigInteger
 
@@ -52,7 +51,7 @@ internal interface UtilApi {
 
     suspend fun isValidSignature(
         transport: Transport,
-        message: String,
+        digest: String,
         signature: String,
         from: String,
         to: String

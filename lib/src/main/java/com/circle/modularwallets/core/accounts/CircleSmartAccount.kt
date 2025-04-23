@@ -32,10 +32,8 @@ import com.circle.modularwallets.core.clients.Client
 import com.circle.modularwallets.core.constants.CIRCLE_SMART_ACCOUNT_VERSION
 import com.circle.modularwallets.core.constants.CIRCLE_SMART_ACCOUNT_VERSION_V1
 import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
-import com.circle.modularwallets.core.constants.EIP712_PREFIX
 import com.circle.modularwallets.core.constants.FACTORY
 import com.circle.modularwallets.core.constants.PUBLIC_KEY_OWN_WEIGHT
-import com.circle.modularwallets.core.constants.REPLAY_SAFE_HASH_V1
 import com.circle.modularwallets.core.constants.SALT
 import com.circle.modularwallets.core.constants.STUB_SIGNATURE
 import com.circle.modularwallets.core.constants.THRESHOLD_WEIGHT
@@ -52,13 +50,9 @@ import com.circle.modularwallets.core.utils.NonceManagerSource
 import com.circle.modularwallets.core.utils.abi.encodeAbiParameters
 import com.circle.modularwallets.core.utils.abi.encodeCallData
 import com.circle.modularwallets.core.utils.abi.encodePacked
-import com.circle.modularwallets.core.utils.data.concat
 import com.circle.modularwallets.core.utils.data.pad
 import com.circle.modularwallets.core.utils.data.slice
-import com.circle.modularwallets.core.utils.encoding.bytesToHex
 import com.circle.modularwallets.core.utils.encoding.stringToHex
-import com.circle.modularwallets.core.utils.encoding.toBytes
-import com.circle.modularwallets.core.utils.encoding.toSha3Bytes
 import com.circle.modularwallets.core.utils.signature.hashMessage
 import com.circle.modularwallets.core.utils.signature.hashTypedData
 import com.circle.modularwallets.core.utils.signature.parseP256Signature
@@ -74,7 +68,6 @@ import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.DynamicStruct
 import org.web3j.abi.datatypes.StaticStruct
 import org.web3j.abi.datatypes.Type
-import org.web3j.abi.datatypes.Utf8String
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Uint256
 import org.web3j.abi.datatypes.generated.Uint8
@@ -276,18 +269,17 @@ class CircleSmartAccount(
     }
 
     /**
-     * Signs the given hex data.
+     * Signs a hash via the Smart Account's owner.
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
-     * @param hex The hex data to sign.
+     * @param messageHash The hash to sign.
      * @return The signed data.
      */
     @ExcludeFromGeneratedCCReport
     @Throws(Exception::class)
-    override suspend fun sign(context: Context, hex: String): String {
-        val digest = toSha3Bytes(hex)
-        val hash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), bytesToHex(digest))
-        val signResult = owner.sign(context, hash)
+    override suspend fun sign(context: Context, messageHash: String): String {
+        val replaySafeMessageHash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), messageHash)
+        val signResult = owner.sign(context, replaySafeMessageHash)
         val signature = encodePackedForSignature(
             signResult,
             owner.getAddress(),
@@ -297,7 +289,7 @@ class CircleSmartAccount(
     }
 
     /**
-     * Signs the given message.
+     * Signs a [EIP-191 Personal Sign message](https://eips.ethereum.org/EIPS/eip-191).
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
      * @param message The message to sign.
@@ -306,9 +298,9 @@ class CircleSmartAccount(
     @ExcludeFromGeneratedCCReport
     @Throws(Exception::class)
     override suspend fun signMessage(context: Context, message: String): String {
-        val digest = toSha3Bytes(hashMessage(message.toByteArray()))
-        val hash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), bytesToHex(digest))
-        val signResult = owner.sign(context, hash)
+        val hashedMessage = hashMessage(message.toByteArray())
+        val replaySafeMessageHash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedMessage)
+        val signResult = owner.sign(context, replaySafeMessageHash)
         val signature = encodePackedForSignature(
             signResult,
             owner.getAddress(),
@@ -327,9 +319,9 @@ class CircleSmartAccount(
     @ExcludeFromGeneratedCCReport
     @Throws(Exception::class)
     override suspend fun signTypedData(context: Context, typedData: String): String {
-        val digest = toSha3Bytes(hashTypedData(typedData))
-        val hash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), bytesToHex(digest))
-        val signResult = owner.sign(context, hash)
+        val hashedTypedData = hashTypedData(typedData)
+        val replaySafeMessageHash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedTypedData)
+        val signResult = owner.sign(context, replaySafeMessageHash)
         val signature = encodePackedForSignature(
             signResult,
             owner.getAddress(),
@@ -339,7 +331,7 @@ class CircleSmartAccount(
     }
 
     /**
-     * Signs the given user operation.
+     * Signs a given user operation.
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
      * @param chainId The chain ID for the user operation. Default is the chain ID of the client.
