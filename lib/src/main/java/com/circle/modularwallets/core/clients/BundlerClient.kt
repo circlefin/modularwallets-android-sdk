@@ -31,11 +31,19 @@ import com.circle.modularwallets.core.apis.public.PublicApiImpl
 import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.chains.Chain
+import com.circle.modularwallets.core.constants.CIRCLE_PLUGIN_ADD_OWNERS_ABI
+import com.circle.modularwallets.core.constants.OWNER_WEIGHT
+import com.circle.modularwallets.core.errors.BaseError
+import com.circle.modularwallets.core.errors.ExecutionRevertedError
+import com.circle.modularwallets.core.errors.InvalidParamsRpcError
+import com.circle.modularwallets.core.errors.UserOperationExecutionError
 import com.circle.modularwallets.core.models.AddressMappingOwner
 import com.circle.modularwallets.core.models.Block
 import com.circle.modularwallets.core.models.CreateAddressMappingResult
+import com.circle.modularwallets.core.models.EOAIdentifier
 import com.circle.modularwallets.core.models.EncodeCallDataArg
 import com.circle.modularwallets.core.models.EntryPoint
+import com.circle.modularwallets.core.models.EoaAddressMappingOwner
 import com.circle.modularwallets.core.models.EstimateFeesPerGasResult
 import com.circle.modularwallets.core.models.EstimateUserOperationGasResult
 import com.circle.modularwallets.core.models.GetUserOperationResult
@@ -44,7 +52,10 @@ import com.circle.modularwallets.core.models.UserOperationReceipt
 import com.circle.modularwallets.core.models.UserOperationV07
 import com.circle.modularwallets.core.models.toRpcUserOperation
 import com.circle.modularwallets.core.transports.Transport
+import com.circle.modularwallets.core.utils.abi.encodeFunctionData
+import com.circle.modularwallets.core.utils.abi.isAddress
 import com.circle.modularwallets.core.utils.encoding.hexToLong
+import com.circle.modularwallets.core.utils.error.isMappedError
 import java.math.BigInteger
 
 class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transport) {
@@ -181,6 +192,80 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
             userOp.toRpcUserOperation(),
             account.entryPoint.address
         )
+    }
+
+    /**
+     * Registers a recovery address during the recovery process.
+     *
+     * @param context The context used to launch any UI needed; use an activity context to make sure the UI will be launched within the same task stack
+     * @param account The Account to use for User Operation execution.
+     * @param recoveryAddress The recovery address.
+     * @param partialUserOp A partially constructed UserOperation object.
+     *                      The `callData` field, if provided, will be **overwritten internally**
+     *                      with the encoded `addOwners` call data based on `recoveryAddress`.
+     * @param paymaster Sets Paymaster configuration for the User Operation.
+     * @param estimateFeesPerGas Prepares fee properties for the User Operation request. Not available in Java.
+     * @return The hash of the sent User Operation, or `null` if no operation was sent because the recovery address already exists.
+     */
+    @ExcludeFromGeneratedCCReport
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun registerRecoveryAddress(
+        context: Context,
+        account: SmartAccount,
+        recoveryAddress: String,
+        partialUserOp: UserOperationV07 = UserOperationV07(),
+        paymaster: Paymaster? = null,
+        estimateFeesPerGas: (suspend (SmartAccount, BundlerClient, UserOperationV07) -> EstimateFeesPerGasResult)? = null
+    ): String? {
+        if(!isAddress(recoveryAddress)){
+            throw BaseError("Invalid recovery address format")
+        }
+        /** Step 1: Create a mapping between the MSCA address and the recovery address */
+        val owners: Array<AddressMappingOwner> = arrayOf(EoaAddressMappingOwner(EOAIdentifier(recoveryAddress)))
+        try {
+            createAddressMapping(account.getAddress(), owners)
+        } catch (error: InvalidParamsRpcError){
+            /**
+             * Ignore "address mapping already exists" errors to ensure idempotency and allow safe retries.
+             * This prevents inconsistent states between RPC calls and onchain transactions.
+             */
+            if(!isMappedError(error)){
+                throw BaseError("Failed to register the recovery address. Please try again.")
+            }
+        }
+
+        /** Step 2: Encode the function call for the userOp */
+        val addOwnersData = encodeFunctionData(
+            "addOwners",
+            CIRCLE_PLUGIN_ADD_OWNERS_ABI,
+            arrayOf(
+                arrayOf(recoveryAddress), // recovery address
+                arrayOf(OWNER_WEIGHT), // weightsToAdd
+                emptyArray<Any>(), // publicKeyOwnersToAdd
+                emptyArray<Any>(), // publicKeyWeightsToAdd
+                0, // newThresholdWeight, 0 means no change
+            )
+        )
+
+        /** Step 3: Send user operation to store the recovery address onchain */
+        try {
+            partialUserOp.callData = addOwnersData
+            return sendUserOperation(
+                context,
+                account,
+                calls = null,// Set to null since callData is assigned directly.
+                partialUserOp,
+                paymaster,
+                estimateFeesPerGas
+            )
+        } catch (error: UserOperationExecutionError){
+            if(error.details == ExecutionRevertedError.message){
+                val isOwner = UtilApiImpl.isOwnerOf(transport, account.getAddress(), recoveryAddress)
+                if(isOwner) return null
+            }
+            throw error
+        }
     }
 
     /**

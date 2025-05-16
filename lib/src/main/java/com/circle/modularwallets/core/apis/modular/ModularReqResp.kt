@@ -20,6 +20,8 @@
 package com.circle.modularwallets.core.apis.modular
 
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
+import com.circle.modularwallets.core.constants.OWNER_WEIGHT
+import com.circle.modularwallets.core.constants.THRESHOLD_WEIGHT
 import com.circle.modularwallets.core.models.AddressMappingOwner
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -77,23 +79,23 @@ data class InitialOwnershipConfiguration(
 
 @JsonClass(generateAdapter = true)
 data class WeightedMultiSig(
-    @Json(name = "webauthnOwners") val webauthnOwners: Array<WebauthnOwner>,
-    @Json(name = "thresholdWeight") val thresholdWeight: Int,
+    @Json(name = "webauthnOwners") val webauthnOwners: Array<WebauthnOwner>? = null,
     @Json(name = "owners") val owners: Array<EoaOwner>? = null,
+    @Json(name = "thresholdWeight") val thresholdWeight: Long,
 )
 
 @ExcludeFromGeneratedCCReport
 @JsonClass(generateAdapter = true)
 data class EoaOwner(
     @Json(name = "address") val address: String,
-    @Json(name = "weight") val weight: Int,
+    @Json(name = "weight") val weight: Long,
 )
 
 @JsonClass(generateAdapter = true)
 data class WebauthnOwner(
     @Json(name = "publicKeyX") val publicKeyX: String,
     @Json(name = "publicKeyY") val publicKeyY: String,
-    @Json(name = "weight") val weight: Int,
+    @Json(name = "weight") val weight: Long,
 )
 
 internal fun getCreateWalletReq(
@@ -108,9 +110,31 @@ internal fun getCreateWalletReq(
                 WeightedMultiSig(
                     arrayOf(
                         WebauthnOwner(
-                            publicKeyX, publicKeyY, 1
+                            publicKeyX, publicKeyY, OWNER_WEIGHT
                         )
-                    ), 1
+                    ), thresholdWeight = THRESHOLD_WEIGHT
+                )
+            ),
+            version
+        ),
+        Metadata(name)
+    )
+}
+
+internal fun getCreateWalletReq(
+    address: String,
+    version: String,
+    name: String? = null
+): GetAddressReq {
+    return GetAddressReq(
+        ScaConfiguration(
+            InitialOwnershipConfiguration(
+                WeightedMultiSig(
+                    null, arrayOf(
+                        EoaOwner(
+                            address, OWNER_WEIGHT
+                        )
+                    ), THRESHOLD_WEIGHT
                 )
             ),
             version

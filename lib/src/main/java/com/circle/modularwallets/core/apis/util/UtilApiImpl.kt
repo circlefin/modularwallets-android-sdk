@@ -20,6 +20,7 @@ package com.circle.modularwallets.core.apis.util
 
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
 import com.circle.modularwallets.core.apis.public.PublicApiImpl.call
+import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
 import com.circle.modularwallets.core.constants.EIP1271_VALID_SIGNATURE
 import com.circle.modularwallets.core.errors.BaseError
 import com.circle.modularwallets.core.transports.RpcRequest
@@ -32,6 +33,7 @@ import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.FunctionReturnDecoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
+import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.Type
@@ -147,6 +149,43 @@ internal object UtilApiImpl : UtilApi {
             return false
         }
         return EIP1271_VALID_SIGNATURE.contentEquals(decoded[0].value as ByteArray)
+    }
+
+    @ExcludeFromGeneratedCCReport
+    override suspend fun isOwnerOf(
+        transport: Transport,
+        account: String,
+        ownerToCheck: String,
+    ): Boolean {
+        val function = Function(
+            "isOwnerOf",
+            listOf<Type<*>>(
+                Address(account),
+                Address(ownerToCheck)
+            ),
+            listOf<TypeReference<*>>(
+                object : TypeReference<Bool>() {})
+        )
+        val data = FunctionEncoder.encode(function)
+        Logger.d(
+            msg = """
+            isOwnerOf > call
+            Account: $account
+            OwnerToCheck: $ownerToCheck
+        """.trimIndent()
+        )
+        val resp = call(
+            transport,
+            from = account,
+            to = CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address,
+            data
+        )
+        val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
+        if (decoded.isEmpty()) {
+            Logger.w(msg = "Empty response from isOwner call")
+            return false
+        }
+        return decoded[0].value as Boolean
     }
 
     override suspend fun getReplaySafeMessageHash(
