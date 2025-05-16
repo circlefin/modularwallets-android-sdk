@@ -21,88 +21,38 @@ package com.circle.modularwallets.core.accounts
 
 import android.content.Context
 import com.circle.modularwallets.core.BuildConfig
+import com.circle.modularwallets.core.accounts.implementations.CircleSmartAccountDelegate
+import com.circle.modularwallets.core.accounts.implementations.LocalCircleSmartAccountDelegate
+import com.circle.modularwallets.core.accounts.implementations.WebAuthnCircleSmartAccountDelegate
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
-import com.circle.modularwallets.core.apis.modular.ModularApiImpl
 import com.circle.modularwallets.core.apis.modular.ModularWallet
-import com.circle.modularwallets.core.apis.modular.ScaConfiguration
-import com.circle.modularwallets.core.apis.modular.getCreateWalletReq
 import com.circle.modularwallets.core.apis.public.PublicApiImpl
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.clients.Client
 import com.circle.modularwallets.core.constants.CIRCLE_SMART_ACCOUNT_VERSION
 import com.circle.modularwallets.core.constants.CIRCLE_SMART_ACCOUNT_VERSION_V1
-import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
 import com.circle.modularwallets.core.constants.FACTORY
-import com.circle.modularwallets.core.constants.PUBLIC_KEY_OWN_WEIGHT
-import com.circle.modularwallets.core.constants.SALT
 import com.circle.modularwallets.core.constants.STUB_SIGNATURE
-import com.circle.modularwallets.core.constants.THRESHOLD_WEIGHT
 import com.circle.modularwallets.core.models.EncodeCallDataArg
 import com.circle.modularwallets.core.models.EntryPoint
 import com.circle.modularwallets.core.models.EstimateUserOperationGasResult
-import com.circle.modularwallets.core.models.SignResult
 import com.circle.modularwallets.core.models.UserOperation
 import com.circle.modularwallets.core.models.UserOperationV07
-import com.circle.modularwallets.core.transports.Transport
 import com.circle.modularwallets.core.utils.FunctionParameters
 import com.circle.modularwallets.core.utils.NonceManager
 import com.circle.modularwallets.core.utils.NonceManagerSource
-import com.circle.modularwallets.core.utils.abi.encodeAbiParameters
 import com.circle.modularwallets.core.utils.abi.encodeCallData
-import com.circle.modularwallets.core.utils.abi.encodePacked
-import com.circle.modularwallets.core.utils.data.pad
-import com.circle.modularwallets.core.utils.data.slice
-import com.circle.modularwallets.core.utils.encoding.stringToHex
 import com.circle.modularwallets.core.utils.signature.hashMessage
 import com.circle.modularwallets.core.utils.signature.hashTypedData
-import com.circle.modularwallets.core.utils.signature.parseP256Signature
 import com.circle.modularwallets.core.utils.smartAccount.getMinimumVerificationGasLimit
 import com.circle.modularwallets.core.utils.userOperation.getUserOperationHash
 import com.circle.modularwallets.core.utils.userOperation.parseFactoryAddressAndData
-import org.web3j.abi.FunctionEncoder
-import org.web3j.abi.TypeReference
-import org.web3j.abi.datatypes.Address
-import org.web3j.abi.datatypes.Bool
-import org.web3j.abi.datatypes.DynamicArray
-import org.web3j.abi.datatypes.DynamicBytes
-import org.web3j.abi.datatypes.DynamicStruct
-import org.web3j.abi.datatypes.StaticStruct
-import org.web3j.abi.datatypes.Type
-import org.web3j.abi.datatypes.generated.Bytes32
-import org.web3j.abi.datatypes.generated.Uint256
-import org.web3j.abi.datatypes.generated.Uint8
-import org.web3j.crypto.Hash
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-
-internal suspend fun getModularWalletAddress(
-    transport: Transport, hexPublicKey: String, version: String, name: String? = null
-): ModularWallet {
-    val (x, y) = parseP256Signature(hexPublicKey)
-    val wallet =
-        ModularApiImpl.getAddress(
-            transport,
-            getCreateWalletReq(x.toString(), y.toString(), version, name)
-        )
-    return wallet
-}
-
-internal suspend fun getComputeWallet(
-    client: Client,
-    owner: Account<SignResult>,
-    version: String
-): ModularWallet {
-    return ModularWallet(
-        address = getAddressFromWebAuthnOwner(client.transport, owner.getAddress()),
-        scaConfiguration = ScaConfiguration(
-            scaCore = version,
-        ),
-    )
-}
 
 internal fun getCurrentDateTime(): String {
     val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
@@ -111,8 +61,8 @@ internal fun getCurrentDateTime(): String {
     return dateFormat.format(currentDate)
 }
 
-internal fun getDefaultWalletName(): String {
-    return "passkey-${getCurrentDateTime()}"
+internal fun getDefaultWalletName(prefix: String): String {
+    return "$prefix-${getCurrentDateTime()}"
 }
 
 /**
@@ -121,7 +71,7 @@ internal fun getDefaultWalletName(): String {
  * @param client The client used to interact with the blockchain.
  * @param owner The owner account associated with the Circle smart account.
  * @param version The version of the Circle smart account. Default is "circle_passkey_account_v1".
- * @param name The wallet name assigned to the newly registered account defaults to the passkey username provided by the end user.
+ * @param name The wallet name assigned to the newly registered account defaults to defaults to passkey-{datetime}.
  * @return The created Circle smart account.
  */
 
@@ -129,23 +79,60 @@ internal fun getDefaultWalletName(): String {
 @JvmOverloads
 suspend fun toCircleSmartAccount(
     client: Client,
-    owner: Account<SignResult>,
+    owner: WebAuthnAccount,
     version: String = CIRCLE_SMART_ACCOUNT_VERSION_V1,
-    name: String = getDefaultWalletName()
+    name: String = getDefaultWalletName(WebAuthnCircleSmartAccountDelegate.WALLET_PREFIX)
 ): CircleSmartAccount {
+    val delegate = WebAuthnCircleSmartAccountDelegate(owner)
     val actualVersion = CIRCLE_SMART_ACCOUNT_VERSION[version] ?: version
     val wallet =
         try {
-            getModularWalletAddress(client.transport, owner.getAddress(), actualVersion, name)
+            delegate.getModularWalletAddress(client.transport, actualVersion, name)
         } catch (e: Throwable) {
             if (BuildConfig.INTERNAL_BUILD) {
-                getComputeWallet(client, owner, actualVersion)
+                delegate.getComputeWallet(client, actualVersion)
             } else {
                 throw e
             }
         }
     val account = CircleSmartAccount(
-        client, owner, wallet
+        client, delegate, wallet
+    )
+    return account
+}
+
+/**
+ * Creates a Circle smart account.
+ *
+ * @param client The client used to interact with the blockchain.
+ * @param owner The owner account associated with the Circle smart account.
+ * @param version The version of the Circle smart account. Default is "circle_passkey_account_v1".
+ * @param name The wallet name assigned to the newly registered account defaults to wallet-{datetime}.
+ * @return The created Circle smart account.
+ */
+
+@Throws(Exception::class)
+@JvmOverloads
+suspend fun toCircleSmartAccount(
+    client: Client,
+    owner: LocalAccount,
+    version: String = CIRCLE_SMART_ACCOUNT_VERSION_V1,
+    name: String = getDefaultWalletName(LocalCircleSmartAccountDelegate.WALLET_PREFIX)
+): CircleSmartAccount {
+    val delegate = LocalCircleSmartAccountDelegate(owner)
+    val actualVersion = CIRCLE_SMART_ACCOUNT_VERSION[version] ?: version
+    val wallet =
+        try {
+            delegate.getModularWalletAddress(client.transport, actualVersion, name)
+        } catch (e: Throwable) {
+            if (BuildConfig.INTERNAL_BUILD) {
+                delegate.getComputeWallet(client, actualVersion)
+            } else {
+                throw e
+            }
+        }
+    val account = CircleSmartAccount(
+        client, delegate, wallet
     )
     return account
 }
@@ -154,17 +141,17 @@ suspend fun toCircleSmartAccount(
  * Class representing a Circle smart account.
  *
  * @param client The client used to interact with the blockchain.
- * @param owner The owner account associated with the Circle Smart account.
  * @param wallet The response containing the created wallet information.
  * @param entryPoint The entry point for the smart account. Default is EntryPoint.V07.
  */
 
 class CircleSmartAccount(
     client: Client,
-    private val owner: Account<SignResult>,
+    private val delegate: CircleSmartAccountDelegate,
     internal val wallet: ModularWallet,
     entryPoint: EntryPoint = EntryPoint.V07
 ) : SmartAccount(client, entryPoint) {
+
     private var deployed = false
     private val nonceManager = NonceManager(object : NonceManagerSource {
         override fun get(parameters: FunctionParameters): BigInteger {
@@ -219,7 +206,7 @@ class CircleSmartAccount(
         wallet.scaConfiguration.initCode?.let {
             return parseFactoryAddressAndData(it)
         }
-        return Pair(FACTORY.address, getFactoryData(owner.getAddress()))
+        return Pair(FACTORY.address, delegate.getFactoryData())
     }
 
     /**
@@ -269,23 +256,18 @@ class CircleSmartAccount(
     }
 
     /**
-     * Signs a hash via the Smart Account's owner.
+     * messageHash The hash to sign.
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
-     * @param messageHash The hash to sign.
+     * @param messageHash The message to sign.
      * @return The signed data.
      */
     @ExcludeFromGeneratedCCReport
     @Throws(Exception::class)
     override suspend fun sign(context: Context, messageHash: String): String {
-        val replaySafeMessageHash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), messageHash)
-        val signResult = owner.sign(context, replaySafeMessageHash)
-        val signature = encodePackedForSignature(
-            signResult,
-            owner.getAddress(),
-            false,
-        )
-        return signature
+        val replaySafeMessageHash =
+            UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), messageHash)
+        return delegate.signAndWrap(context, replaySafeMessageHash, false)
     }
 
     /**
@@ -299,18 +281,13 @@ class CircleSmartAccount(
     @Throws(Exception::class)
     override suspend fun signMessage(context: Context, message: String): String {
         val hashedMessage = hashMessage(message.toByteArray())
-        val replaySafeMessageHash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedMessage)
-        val signResult = owner.sign(context, replaySafeMessageHash)
-        val signature = encodePackedForSignature(
-            signResult,
-            owner.getAddress(),
-            false,
-        )
-        return signature
+        val replaySafeMessageHash =
+            UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedMessage)
+        return delegate.signAndWrap(context, replaySafeMessageHash, false)
     }
 
     /**
-     * Signs the given typed data.
+     * Signs a given typed data.
      *
      * @param context The context used to launch framework UI flows ; use an activity context to make sure the UI will be launched within the same task stack.
      * @param typedData The typed data to sign.
@@ -320,14 +297,9 @@ class CircleSmartAccount(
     @Throws(Exception::class)
     override suspend fun signTypedData(context: Context, typedData: String): String {
         val hashedTypedData = hashTypedData(typedData)
-        val replaySafeMessageHash = UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedTypedData)
-        val signResult = owner.sign(context, replaySafeMessageHash)
-        val signature = encodePackedForSignature(
-            signResult,
-            owner.getAddress(),
-            false,
-        )
-        return signature
+        val replaySafeMessageHash =
+            UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedTypedData)
+        return delegate.signAndWrap(context, replaySafeMessageHash, false)
     }
 
     /**
@@ -345,14 +317,7 @@ class CircleSmartAccount(
     ): String {
         userOp.sender = getAddress()
         val userOpHash = getUserOperationHash(chainId, userOp = userOp)
-        val hash = hashMessage(userOpHash)
-        val signResult = owner.sign(context, hash)
-        val signature = encodePackedForSignature(
-            signResult,
-            owner.getAddress(),
-            true,
-        )
-        return signature
+        return delegate.signAndWrap(context, userOpHash, true)
     }
 
     /**
@@ -364,157 +329,4 @@ class CircleSmartAccount(
         return wallet.getInitCode()
     }
 
-}
-
-internal fun encodePackedForSignature(
-    signResult: SignResult,
-    publicKey: String,
-    hasUserOpGas: Boolean,
-): String {
-    val (x, y) = parseP256Signature(publicKey)
-    val sender = getSender(x, y)
-
-    val sigBytes = encodeWebAuthnSigDynamicPart(signResult)
-    val formattedSender = getFormattedSender(sender)
-    val sigType: Long = if (hasUserOpGas) 34 else 2
-    val encoded =
-        encodePacked(
-            listOf<Type<*>>(
-                Bytes32(formattedSender),
-                Uint256(65), // dynamicPos
-                Uint8(sigType),
-                Uint256(sigBytes.size.toLong()),
-                DynamicBytes(sigBytes),
-            )
-        )
-
-    return encoded
-}
-
-internal fun encodeWebAuthnSigDynamicPart(signResult: SignResult): ByteArray {
-    val (r, s) = parseP256Signature(signResult.signature)
-    val encoded = encodeParametersWebAuthnSigDynamicPart(
-        signResult.webAuthn.authenticatorData,
-        signResult.webAuthn.clientDataJSON,
-        signResult.webAuthn.challengeIndex.toLong(),
-        signResult.webAuthn.typeIndex.toLong(),
-        true,
-        r,
-        s
-    )
-    return Numeric.hexStringToByteArray(encoded)
-}
-
-internal fun encodeParametersWebAuthnSigDynamicPart(
-    authenticatorData: String,
-    clientDataJSON: String,
-    challengeIndex: Long,
-    typeIndex: Long,
-    requireUserVerification: Boolean,
-    r: BigInteger,
-    s: BigInteger
-): String {
-    val encoded = encodeAbiParameters(
-        listOf<Type<*>>(
-            DynamicStruct(
-                DynamicStruct(
-                    DynamicBytes(Numeric.hexStringToByteArray(authenticatorData)),
-                    DynamicBytes(Numeric.hexStringToByteArray(stringToHex(clientDataJSON))),
-                    Uint256(challengeIndex),
-                    Uint256(typeIndex),
-                    Bool(requireUserVerification),
-                ),
-                Uint256(r),
-                Uint256(s),
-            )
-        )
-    )
-    return encoded
-}
-
-internal fun getFormattedSender(sender: String): ByteArray {
-    return Numeric.hexStringToByteArray(pad(slice(sender, 2)))
-}
-
-internal fun getPluginInstallParams(x: BigInteger, y: BigInteger): String {
-    val encoded = encodeAbiParameters(
-        listOf(
-            DynamicArray(Address::class.java), DynamicArray(Uint256::class.java), DynamicArray(
-                StaticStruct::class.java,
-                StaticStruct(
-                    Uint256(x),
-                    Uint256(y),
-                ),
-            ), DynamicArray(
-                Uint256::class.java, Uint256(PUBLIC_KEY_OWN_WEIGHT)
-            ), Uint256(THRESHOLD_WEIGHT)
-        )
-    )
-    return encoded
-}
-
-internal fun getInitializeUpgradableMSCAParams(x: BigInteger, y: BigInteger): String {
-    val pluginInstallParams = getPluginInstallParams(x, y)
-    val encoded = encodeAbiParameters(
-        listOf(
-            DynamicArray(
-                Address::class.java,
-                Address(CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address),
-            ),
-            DynamicArray(
-                Bytes32::class.java,
-                Bytes32(CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.manifestHash),
-            ),
-            DynamicArray(
-                DynamicBytes::class.java,
-                DynamicBytes(Numeric.hexStringToByteArray(pluginInstallParams)),
-            ),
-        )
-    )
-    return encoded
-}
-
-internal fun getSender(x: BigInteger, y: BigInteger): String {
-    val encoded = getSenderParams(x, y)
-    return Hash.sha3(encoded)
-}
-
-internal fun getSenderParams(x: BigInteger, y: BigInteger): String {
-    return encodeAbiParameters(
-        listOf(
-            Uint256(x),
-            Uint256(y),
-        )
-    )
-}
-
-internal fun getFactoryData(publicKey: String): String {
-    val (x, y) = parseP256Signature(publicKey)
-    val sender = getSender(x, y)
-    val initializeUpgradableMSCAParams = getInitializeUpgradableMSCAParams(x, y)
-    val function = org.web3j.abi.datatypes.Function(
-        "createAccount", listOf(
-            Bytes32(Numeric.hexStringToByteArray(sender)),
-            Bytes32(SALT),
-            DynamicBytes(Numeric.hexStringToByteArray(initializeUpgradableMSCAParams)),
-        ), listOf<TypeReference<*>>(object : TypeReference<Address>() {})
-    )
-    val factoryData = FunctionEncoder.encode(function)
-    return factoryData
-}
-
-internal suspend fun getAddressFromWebAuthnOwner(transport: Transport, publicKey: String): String {
-    val (x, y) = parseP256Signature(publicKey)
-    val sender = getSender(x, y)
-    val initializeUpgradableMSCAParams = getInitializeUpgradableMSCAParams(x, y)
-
-    /** address, mixedSalt */
-    val result = UtilApiImpl.getAddress(
-        transport,
-        FACTORY.address,
-        Numeric.hexStringToByteArray(sender),
-        SALT,
-        Numeric.hexStringToByteArray(initializeUpgradableMSCAParams)
-    )
-    return result.first
 }

@@ -63,4 +63,9 @@ internal interface UtilApi {
         hash: String,
     ): String
 
+    suspend fun isOwnerOf(
+        transport: Transport,
+        account: String,
+        ownerToCheck: String,
+    ): Boolean
 }

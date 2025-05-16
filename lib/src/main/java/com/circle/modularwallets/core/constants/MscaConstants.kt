@@ -22,7 +22,9 @@ import com.circle.modularwallets.core.utils.data.pad
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 
-val MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(600_000)
+// Lowered to 100,000 due to pre-op gas limit efficiency issues on multiple testnets.
+// See CCS-1984: https://circlepay.atlassian.net/browse/CCS-1984
+val MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(100_000)
 val MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(1_500_000)
 val SEPOLIA_MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(600_000)
 val SEPOLIA_MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(2_000_000)
@@ -58,8 +60,8 @@ val EIP1271_VALID_SIGNATURE = byteArrayOf(0x16, 0x26, 0xba.toByte(), 0x7e)
 /** The salt for the MSCA factory contract. */
 internal val SALT = Numeric.hexStringToByteArray(pad("0x", 32))
 
-/** The public key own weights. */
-val PUBLIC_KEY_OWN_WEIGHT = 1L
+/** The default owner weight. */
+val OWNER_WEIGHT = 1L
 
 /** The threshold weight. */
 val THRESHOLD_WEIGHT = 1L
@@ -69,3 +71,10 @@ const val CIRCLE_SMART_ACCOUNT_VERSION_V1 = "circle_passkey_account_v1"
 internal val CIRCLE_SMART_ACCOUNT_VERSION: Map<String, String> = mapOf(
     CIRCLE_SMART_ACCOUNT_VERSION_V1 to "circle_6900_v1"
 )
+
+/* Signature flag */
+internal const val SIG_TYPE_FLAG_DIGEST = 32L
+/* Base type */
+internal const val SIG_TYPE_SECP256R1 = 2L
+/* Digest-flagged type */
+internal const val SIG_TYPE_SECP256R1_DIGEST = 34L
