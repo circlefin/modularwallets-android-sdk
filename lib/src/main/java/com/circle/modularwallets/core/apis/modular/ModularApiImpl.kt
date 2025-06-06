@@ -20,8 +20,9 @@ package com.circle.modularwallets.core.apis.modular
 
 import com.circle.modularwallets.core.errors.BaseError
 import com.circle.modularwallets.core.models.AddressMappingOwner
-import com.circle.modularwallets.core.models.CreateAddressMappingResult
+import com.circle.modularwallets.core.models.AddressMappingResult
 import com.circle.modularwallets.core.models.EoaAddressMappingOwner
+import com.circle.modularwallets.core.models.GetUserOperationGasPriceResult
 import com.circle.modularwallets.core.models.WebAuthnAddressMappingOwner
 import com.circle.modularwallets.core.transports.RpcRequest
 import com.circle.modularwallets.core.transports.Transport
@@ -43,7 +44,7 @@ internal object ModularApiImpl : ModularApi {
         transport: Transport,
         walletAddress: String,
         owners: Array<AddressMappingOwner>
-    ): Array<CreateAddressMappingResult> {
+    ): Array<AddressMappingResult> {
         if (!isAddress(walletAddress)) {
             throw BaseError("walletAddress is invalid")
         }
@@ -75,10 +76,50 @@ internal object ModularApiImpl : ModularApi {
             listOf(CreateAddressMappingReq(walletAddress, owners))
         )
         val rawList = performJsonRpcRequest(transport, req) as ArrayList<*>
-        val result: Array<CreateAddressMappingResult> = rawList.mapNotNull { item ->
-            resultToTypeAndJson(item, CreateAddressMappingResult::class.java).first
-        }.toTypedArray()
+        val result: Array<AddressMappingResult> = processAddressMappingResponse(rawList)
         return result
+    }
+
+    override suspend fun getAddressMapping(
+        transport: Transport,
+        owner: AddressMappingOwner
+    ): Array<AddressMappingResult> {
+        val req = RpcRequest(
+            "circle_getAddressMapping",
+            listOf(GetAddressMappingReq(owner))
+        )
+        val rawList = performJsonRpcRequest(transport, req) as ArrayList<*>
+        val result: Array<AddressMappingResult> = processAddressMappingResponse(rawList)
+        return result
+    }
+
+    private fun processAddressMappingResponse(rawList: ArrayList<*>):
+            Array<AddressMappingResult> {
+        return rawList.mapNotNull { item ->
+            resultToTypeAndJson(item, AddressMappingResult::class.java).first
+        }.toTypedArray()
+    }
+    /**
+     * Gets the gas price options for a user operation.
+     *
+     * @param transport The transport to use for the request.
+     * @return The gas price options with low, medium, high tiers and optional verificationGasLimit.
+     */
+    override suspend fun getUserOperationGasPrice(
+        transport: Transport,
+    ): GetUserOperationGasPriceResult {
+
+        val req = RpcRequest(
+            "circle_getUserOperationGasPrice"
+        )
+        
+        val result = performJsonRpcRequest(
+            transport,
+            req,
+            GetUserOperationGasPriceResult::class.java
+        )
+        
+        return result.first
     }
 }
 

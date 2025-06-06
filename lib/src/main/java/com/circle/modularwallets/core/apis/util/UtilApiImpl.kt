@@ -36,6 +36,7 @@ import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.Function
+import org.web3j.abi.datatypes.StaticStruct
 import org.web3j.abi.datatypes.Type
 import org.web3j.abi.datatypes.generated.Bytes32
 import org.web3j.abi.datatypes.generated.Bytes4
@@ -172,6 +173,48 @@ internal object UtilApiImpl : UtilApi {
             isOwnerOf > call
             Account: $account
             OwnerToCheck: $ownerToCheck
+        """.trimIndent()
+        )
+        val resp = call(
+            transport,
+            from = account,
+            to = CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address,
+            data
+        )
+        val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
+        if (decoded.isEmpty()) {
+            Logger.w(msg = "Empty response from isOwner call")
+            return false
+        }
+        return decoded[0].value as Boolean
+    }
+    @ExcludeFromGeneratedCCReport
+    override suspend fun isOwnerOf(
+        transport: Transport,
+        account: String,
+        xOfOwnerToCheck: String,
+        yOfOwnerToCheck: String,
+    ): Boolean {
+        val publicKeys = StaticStruct(
+            Uint256(BigInteger(xOfOwnerToCheck)),
+            Uint256(BigInteger(yOfOwnerToCheck))
+        )
+        val function = Function(
+            "isOwnerOf",
+            listOf<Type<*>>(
+                Address(account),
+                publicKeys
+            ),
+            listOf<TypeReference<*>>(
+                object : TypeReference<Bool>() {})
+        )
+        val data = FunctionEncoder.encode(function)
+        Logger.d(
+            msg = """
+            isOwnerOf > call
+            Account: $account
+            xOfOwnerToCheck: $xOfOwnerToCheck
+            yOfOwnerToCheck: $yOfOwnerToCheck
         """.trimIndent()
         )
         val resp = call(

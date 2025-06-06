@@ -44,7 +44,7 @@ import com.circle.modularwallets.core.utils.NonceManagerSource
 import com.circle.modularwallets.core.utils.abi.encodeCallData
 import com.circle.modularwallets.core.utils.signature.hashMessage
 import com.circle.modularwallets.core.utils.signature.hashTypedData
-import com.circle.modularwallets.core.utils.smartAccount.getMinimumVerificationGasLimit
+import com.circle.modularwallets.core.utils.smartAccount.getDefaultVerificationGasLimit
 import com.circle.modularwallets.core.utils.userOperation.getUserOperationHash
 import com.circle.modularwallets.core.utils.userOperation.parseFactoryAddressAndData
 import org.web3j.utils.Numeric
@@ -167,8 +167,7 @@ class CircleSmartAccount(
      */
     override var userOperation: UserOperationConfiguration? =
         UserOperationConfiguration { userOperation ->
-            val minimumVerificationGasLimit =
-                getMinimumVerificationGasLimit(isDeployed(), client.chain.chainId)
+            val minimumVerificationGasLimit = getDefaultVerificationGasLimit(isDeployed(), client.transport)
             EstimateUserOperationGasResult(
                 verificationGasLimit = minimumVerificationGasLimit
                     .max(userOperation.verificationGasLimit ?: BigInteger.ZERO)

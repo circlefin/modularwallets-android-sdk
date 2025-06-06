@@ -20,6 +20,7 @@ package com.circle.modularwallets.core.clients
 
 import android.content.Context
 import com.circle.modularwallets.core.accounts.SmartAccount
+import com.circle.modularwallets.core.accounts.WebAuthnCredential
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
 import com.circle.modularwallets.core.apis.bundler.BundlerApi
 import com.circle.modularwallets.core.apis.bundler.BundlerApiImpl
@@ -34,28 +35,36 @@ import com.circle.modularwallets.core.chains.Chain
 import com.circle.modularwallets.core.constants.CIRCLE_PLUGIN_ADD_OWNERS_ABI
 import com.circle.modularwallets.core.constants.OWNER_WEIGHT
 import com.circle.modularwallets.core.errors.BaseError
+import com.circle.modularwallets.core.errors.BaseErrorParameters
 import com.circle.modularwallets.core.errors.ExecutionRevertedError
 import com.circle.modularwallets.core.errors.InvalidParamsRpcError
 import com.circle.modularwallets.core.errors.UserOperationExecutionError
 import com.circle.modularwallets.core.models.AddressMappingOwner
+import com.circle.modularwallets.core.models.AddressMappingResult
 import com.circle.modularwallets.core.models.Block
-import com.circle.modularwallets.core.models.CreateAddressMappingResult
 import com.circle.modularwallets.core.models.EOAIdentifier
 import com.circle.modularwallets.core.models.EncodeCallDataArg
 import com.circle.modularwallets.core.models.EntryPoint
 import com.circle.modularwallets.core.models.EoaAddressMappingOwner
 import com.circle.modularwallets.core.models.EstimateFeesPerGasResult
 import com.circle.modularwallets.core.models.EstimateUserOperationGasResult
+import com.circle.modularwallets.core.models.GetUserOperationGasPriceResult
 import com.circle.modularwallets.core.models.GetUserOperationResult
 import com.circle.modularwallets.core.models.Paymaster
 import com.circle.modularwallets.core.models.UserOperationReceipt
 import com.circle.modularwallets.core.models.UserOperationV07
+import com.circle.modularwallets.core.models.WebAuthnAddressMappingOwner
+import com.circle.modularwallets.core.models.WebAuthnIdentifier
 import com.circle.modularwallets.core.models.toRpcUserOperation
 import com.circle.modularwallets.core.transports.Transport
 import com.circle.modularwallets.core.utils.abi.encodeFunctionData
+import com.circle.modularwallets.core.utils.abi.getAddOwnersData
 import com.circle.modularwallets.core.utils.abi.isAddress
 import com.circle.modularwallets.core.utils.encoding.hexToLong
 import com.circle.modularwallets.core.utils.error.isMappedError
+import com.circle.modularwallets.core.utils.signature.parseP256Signature
+import org.web3j.abi.datatypes.StaticStruct
+import org.web3j.abi.datatypes.generated.Uint256
 import java.math.BigInteger
 
 class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transport) {
@@ -72,7 +81,6 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
      * @param estimateFeesPerGas Prepares fee properties for the User Operation request. Not available in Java.
      * @return The estimated gas values for the User Operation.
      */
-
     @Throws(Exception::class)
     @JvmOverloads
     suspend fun estimateUserOperationGas(
@@ -94,6 +102,83 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
                 )
             }
         }
+        return api.estimateUserOperationGas(transport, userOp, account.entryPoint)
+    }
+
+    /**
+     * Estimates the gas required to execute and finalize the recovery process.
+     *
+     * @param account The Account to use for User Operation execution.
+     * @param credential The newly registered passkey credential.
+     * @param partialUserOp A partially constructed UserOperation object that can include custom gas parameters.
+     *                      The `callData` field, if provided, will be **overwritten internally**
+     *                      with the encoded `addOwners` call data based on `credential`.
+     * @param paymaster Sets Paymaster configuration for the User Operation.
+     * @param estimateFeesPerGas Prepares fee properties for the User Operation request. Not available in Java.
+
+     * @return An estimate of gas values necessary to execute recovery.
+     */
+    @ExcludeFromGeneratedCCReport
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun estimateExecuteRecoveryGas(
+        account: SmartAccount,
+        credential: WebAuthnCredential,
+        partialUserOp: UserOperationV07 = UserOperationV07(),
+        paymaster: Paymaster? = null,
+        estimateFeesPerGas: (suspend (SmartAccount, BundlerClient, UserOperationV07) -> EstimateFeesPerGasResult)? = null
+    ): EstimateUserOperationGasResult {
+        val addOwnersData = getAddOwnersData(credential)
+        partialUserOp.callData = addOwnersData
+        val userOp = api.prepareUserOperation(
+            transport,
+            account,
+            calls = null,
+            partialUserOp,
+            paymaster,
+            this,
+            estimateFeesPerGas
+        )
+        return api.estimateUserOperationGas(transport, userOp, account.entryPoint)
+    }
+
+    /**
+     * Estimates the gas required to register a recovery address during the recovery process.
+     *
+     * @param account The Account to use for User Operation execution.
+     * @param recoveryAddress The derived address of the recovery key.
+     * @param partialUserOp A partially constructed UserOperation object that can include custom gas parameters.
+     *                      The `callData` field, if provided, will be **overwritten internally**
+     *                      with the encoded `addOwners` call data based on `recoveryAddress`.
+     * @param paymaster Sets Paymaster configuration for the User Operation.
+     * @param estimateFeesPerGas Prepares fee properties for the User Operation request. Not available in Java.
+
+     * @return An estimate of gas values necessary to register a recovery address.
+     */
+    @ExcludeFromGeneratedCCReport
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun estimateRegisterRecoveryAddressGas(
+        account: SmartAccount,
+        recoveryAddress: String,
+        partialUserOp: UserOperationV07 = UserOperationV07(),
+        paymaster: Paymaster? = null,
+        estimateFeesPerGas: (suspend (SmartAccount, BundlerClient, UserOperationV07) -> EstimateFeesPerGasResult)? = null
+    ): EstimateUserOperationGasResult {
+        if (!isAddress(recoveryAddress)) {
+            throw BaseError("Invalid recovery address format")
+        }
+        val addOwnersData = getAddOwnersData(recoveryAddress)
+        partialUserOp.callData = addOwnersData
+        val userOp = api.prepareUserOperation(
+            transport,
+            account,
+            calls = null,
+            partialUserOp,
+            paymaster,
+            this,
+            estimateFeesPerGas
+        )
         return api.estimateUserOperationGas(transport, userOp, account.entryPoint)
     }
 
@@ -218,35 +303,26 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
         paymaster: Paymaster? = null,
         estimateFeesPerGas: (suspend (SmartAccount, BundlerClient, UserOperationV07) -> EstimateFeesPerGasResult)? = null
     ): String? {
-        if(!isAddress(recoveryAddress)){
+        if (!isAddress(recoveryAddress)) {
             throw BaseError("Invalid recovery address format")
         }
         /** Step 1: Create a mapping between the MSCA address and the recovery address */
-        val owners: Array<AddressMappingOwner> = arrayOf(EoaAddressMappingOwner(EOAIdentifier(recoveryAddress)))
+        val owners: Array<AddressMappingOwner> =
+            arrayOf(EoaAddressMappingOwner(EOAIdentifier(recoveryAddress)))
         try {
             createAddressMapping(account.getAddress(), owners)
-        } catch (error: InvalidParamsRpcError){
+        } catch (error: InvalidParamsRpcError) {
             /**
              * Ignore "address mapping already exists" errors to ensure idempotency and allow safe retries.
              * This prevents inconsistent states between RPC calls and onchain transactions.
              */
-            if(!isMappedError(error)){
-                throw BaseError("Failed to register the recovery address. Please try again.")
+            if (!isMappedError(error)) {
+                throw BaseError("Failed to register the recovery address. Please try again.", BaseErrorParameters(error))
             }
         }
 
         /** Step 2: Encode the function call for the userOp */
-        val addOwnersData = encodeFunctionData(
-            "addOwners",
-            CIRCLE_PLUGIN_ADD_OWNERS_ABI,
-            arrayOf(
-                arrayOf(recoveryAddress), // recovery address
-                arrayOf(OWNER_WEIGHT), // weightsToAdd
-                emptyArray<Any>(), // publicKeyOwnersToAdd
-                emptyArray<Any>(), // publicKeyWeightsToAdd
-                0, // newThresholdWeight, 0 means no change
-            )
-        )
+        val addOwnersData = getAddOwnersData(recoveryAddress)
 
         /** Step 3: Send user operation to store the recovery address onchain */
         try {
@@ -259,10 +335,85 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
                 paymaster,
                 estimateFeesPerGas
             )
-        } catch (error: UserOperationExecutionError){
-            if(error.details == ExecutionRevertedError.message){
-                val isOwner = UtilApiImpl.isOwnerOf(transport, account.getAddress(), recoveryAddress)
-                if(isOwner) return null
+        } catch (error: UserOperationExecutionError) {
+            if (error.details == ExecutionRevertedError.message) {
+                val isOwner =
+                    UtilApiImpl.isOwnerOf(transport, account.getAddress(), recoveryAddress)
+                if (isOwner) return null
+            }
+            throw error
+        }
+    }
+
+    /**
+     * Executes and finalizes the recovery process.
+     *
+     * @param context The context used to launch any UI needed; use an activity context to make sure the UI will be launched within the same task stack
+     * @param account The Account to use for User Operation execution.
+     * @param credential The newly registered passkey credential.
+     * @param partialUserOp A partially constructed UserOperation object.
+     *                      The `callData` field, if provided, will be **overwritten internally**
+     *                      with the encoded `addOwners` call data based on `credential`.
+     * @param paymaster Sets Paymaster configuration for the User Operation.
+     * @param estimateFeesPerGas Prepares fee properties for the User Operation request. Not available in Java.
+     * @return The hash of the sent User Operation, or `null` if no operation was sent because the recovery address already exists.
+     */
+    @ExcludeFromGeneratedCCReport
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun executeRecovery(
+        context: Context,
+        account: SmartAccount,
+        credential: WebAuthnCredential,
+        partialUserOp: UserOperationV07 = UserOperationV07(),
+        paymaster: Paymaster? = null,
+        estimateFeesPerGas: (suspend (SmartAccount, BundlerClient, UserOperationV07) -> EstimateFeesPerGasResult)? = null
+    ): String? {
+        if (credential.publicKey.isEmpty()) {
+            throw BaseError("WebAuthn credential has missing public key")
+        }
+        val (x, y) = try {
+            parseP256Signature(credential.publicKey)
+        } catch (e: Exception) {
+            throw BaseError("Invalid public key: failed to parse P256 signature", BaseErrorParameters(e))
+        }
+        /** Step 1: Create a mapping between the MSCA address and the WebAuthn credential */
+        val owners: Array<AddressMappingOwner> = arrayOf(
+            WebAuthnAddressMappingOwner(
+                WebAuthnIdentifier(x.toString(), y.toString())
+            )
+        )
+        try {
+            createAddressMapping(account.getAddress(), owners)
+        } catch (error: InvalidParamsRpcError) {
+            /**
+             * Ignore "address mapping already exists" errors to ensure idempotency and allow safe retries.
+             * This prevents inconsistent states between RPC calls and onchain transactions.
+             */
+            if (!isMappedError(error)) {
+                throw BaseError("Failed to register the recovery address. Please try again.", BaseErrorParameters(error))
+            }
+        }
+
+        /** Step 2: Encode the function call for the userOp */
+        val addOwnersData = getAddOwnersData(credential)
+
+        /** Step 3: Send user operation to store the recovery address onchain */
+        try {
+            partialUserOp.callData = addOwnersData
+            return sendUserOperation(
+                context,
+                account,
+                calls = null,// Set to null since callData is assigned directly.
+                partialUserOp,
+                paymaster,
+                estimateFeesPerGas
+            )
+        } catch (error: UserOperationExecutionError) {
+            if (error.details == ExecutionRevertedError.message) {
+                val isOwner =
+                    UtilApiImpl.isOwnerOf(transport, account.getAddress(), x.toString(), y.toString())
+                if (isOwner) return null
             }
             throw error
         }
@@ -489,7 +640,32 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
     suspend fun createAddressMapping(
         walletAddress: String,
         owners: Array<AddressMappingOwner>
-    ): Array<CreateAddressMappingResult> {
+    ): Array<AddressMappingResult> {
         return ModularApiImpl.createAddressMapping(transport, walletAddress, owners)
+    }
+
+    /**
+     * Gets the address mapping for a given owner.
+     *
+     * @param owner The owner information.
+     * @return An array of address mappings associated with the given owner.
+     */
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun getAddressMapping(
+        owner: AddressMappingOwner
+    ): Array<AddressMappingResult> {
+        return ModularApiImpl.getAddressMapping(transport, owner)
+    }
+    
+    /**
+     * Gets the user operation gas price.
+     *
+     * @return The user operation gas price. See [GetUserOperationGasPriceResult].
+     */
+    @Throws(Exception::class)
+    @JvmOverloads
+    suspend fun getUserOperationGasPrice(): GetUserOperationGasPriceResult {
+        return ModularApiImpl.getUserOperationGasPrice(transport)
     }
 }

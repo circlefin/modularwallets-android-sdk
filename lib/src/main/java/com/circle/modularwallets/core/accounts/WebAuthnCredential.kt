@@ -45,7 +45,6 @@ import com.circle.modularwallets.core.utils.webauthn.getSavedCredentials
  * Throws: BaseError if userName is null for WebAuthnMode.Register.
  *
  */
-
 @ExcludeFromGeneratedCCReport
 @Throws(Exception::class)
 @JvmOverloads

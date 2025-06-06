@@ -68,4 +68,11 @@ internal interface UtilApi {
         account: String,
         ownerToCheck: String,
     ): Boolean
+
+    suspend fun isOwnerOf(
+        transport: Transport,
+        account: String,
+        ownerXToCheck: String,
+        ownerYToCheck: String,
+    ): Boolean
 }

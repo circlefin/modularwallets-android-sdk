@@ -148,3 +148,8 @@ internal data class CreateAddressMappingReq(
     @Json(name = "walletAddress") val walletAddress: String,
     @Json(name = "owners") val owners: Array<AddressMappingOwner>,
 )
+
+@JsonClass(generateAdapter = true)
+internal data class GetAddressMappingReq(
+    @Json(name = "owner") val owner: AddressMappingOwner,
+)
