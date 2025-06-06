@@ -18,12 +18,15 @@
 
 package com.circle.modularwallets.core.utils.abi
 
+import com.circle.modularwallets.core.accounts.WebAuthnCredential
+import com.circle.modularwallets.core.constants.CIRCLE_PLUGIN_ADD_OWNERS_ABI
+import com.circle.modularwallets.core.constants.OWNER_WEIGHT
 import com.circle.modularwallets.core.errors.BaseError
 import com.circle.modularwallets.core.errors.BaseErrorParameters
+import com.circle.modularwallets.core.utils.signature.parseP256Signature
 import com.google.gson.Gson
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
-import org.web3j.abi.datatypes.AbiTypes
 import org.web3j.abi.datatypes.Address
 import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.DynamicArray
@@ -182,6 +185,7 @@ internal fun encodeFunctionData(
         throw BaseError("encode function failed", BaseErrorParameters(e))
     }
 }
+
 internal fun encodeFunction(abiDefinition: AbiDefinition, function: Function): String {
     val oriAbi = FunctionEncoder.encode(function)
     val encodedParameters = oriAbi.substring(10)
@@ -237,7 +241,6 @@ private fun inputFormat(
             }
 
 
-
             type.startsWith("tuple") -> {
                 getTuple(params[i])
             }
@@ -257,7 +260,8 @@ internal fun getTuple(param: Any): Type<*> {
         is DynamicStruct -> param
         is List<*> -> {
             val tupleElements = param.filterIsInstance<Type<*>>()
-            val hasDynamicType = param.any { it is DynamicBytes || it is Utf8String || it is DynamicArray<*> }
+            val hasDynamicType =
+                param.any { it is DynamicBytes || it is Utf8String || it is DynamicArray<*> }
             if (hasDynamicType) {
                 DynamicStruct(tupleElements)
             } else {
@@ -268,7 +272,8 @@ internal fun getTuple(param: Any): Type<*> {
         else -> {
             val tupleElements = (param as? Array<*>)?.mapNotNull { it as? Type<*> }
                 ?: throw BaseError("Expected an array, but got ${param::class}")
-            val hasDynamicType = tupleElements.any { it is DynamicBytes || it is Utf8String || it is DynamicArray<*> }
+            val hasDynamicType =
+                tupleElements.any { it is DynamicBytes || it is Utf8String || it is DynamicArray<*> }
             if (hasDynamicType) {
                 DynamicStruct(tupleElements)
             } else {
@@ -761,3 +766,64 @@ private fun getAbiDefinition(name: String, contractAbi: String?): AbiDefinition?
     return result
 }
 
+
+internal fun getAddOwnersData(
+    credential: WebAuthnCredential
+): String {
+    if (credential.publicKey.isEmpty()) {
+        throw BaseError("WebAuthn credential has missing public key")
+    }
+    val (x, y) = try {
+        parseP256Signature(credential.publicKey)
+    } catch (e: Exception) {
+        throw BaseError("Invalid public key: failed to parse P256 signature", BaseErrorParameters(e))
+    }
+    val publicKeys = StaticStruct(
+        Uint256(BigInteger(x.toString())),
+        Uint256(BigInteger(y.toString()))
+    )
+    return getAddOwnersData(
+        emptyArray<Any>(),
+        emptyArray<Any>(),
+        arrayOf(
+            publicKeys
+        ),
+        arrayOf(OWNER_WEIGHT)
+    )
+}
+
+internal fun getAddOwnersData(
+    ownerToAdd: String
+): String {
+    return getAddOwnersData(
+        arrayOf(ownerToAdd),
+        arrayOf(OWNER_WEIGHT),
+        emptyArray<Any>(),
+        emptyArray<Any>(),
+    )
+}
+
+internal fun getAddOwnersData(
+    ownersToAdd: Array<Any>,
+    weightsToAdd: Array<Any>,
+    publicKeyOwnersToAdd: Array<Any>,
+    publicKeyWeightsToAdd: Array<Any>,
+): String {
+    if (ownersToAdd.isNotEmpty() && ownersToAdd.size != weightsToAdd.size) {
+        throw BaseError("Number of owners must match the number of weights")
+    }
+    if (publicKeyOwnersToAdd.isNotEmpty() && publicKeyOwnersToAdd.size != publicKeyWeightsToAdd.size) {
+        throw BaseError("Number of public key owners must match the number of weights")
+    }
+    return encodeFunctionData(
+        "addOwners",
+        CIRCLE_PLUGIN_ADD_OWNERS_ABI,
+        arrayOf(
+            ownersToAdd,
+            weightsToAdd,
+            publicKeyOwnersToAdd,
+            publicKeyWeightsToAdd,
+            0, // newThresholdWeight, 0 means no change
+        )
+    )
+}

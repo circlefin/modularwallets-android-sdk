@@ -26,11 +26,6 @@ import java.math.BigInteger
 // See CCS-1984: https://circlepay.atlassian.net/browse/CCS-1984
 val MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(100_000)
 val MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(1_500_000)
-val SEPOLIA_MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(600_000)
-val SEPOLIA_MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(2_000_000)
-val MAINNET_MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(1_000_000)
-val MAINNET_MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(2_500_000)
-
 
 /** The Circle Upgradable MSCA Factory. */
 object FACTORY {

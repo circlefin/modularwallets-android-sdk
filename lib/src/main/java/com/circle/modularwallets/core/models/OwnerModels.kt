@@ -79,7 +79,7 @@ data class WebAuthnAddressMappingOwner(
  * The response from adding an address mapping.
  */
 @JsonClass(generateAdapter = true)
-data class CreateAddressMappingResult(
+data class AddressMappingResult(
     /**
      * The mapping ID.
      */
