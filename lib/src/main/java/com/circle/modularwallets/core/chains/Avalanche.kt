@@ -15,27 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.circle.modularwallets.core.models
 
-import com.circle.modularwallets.core.utils.abi.encodeTransfer
+package com.circle.modularwallets.core.chains
 
-/**
- * Enum representing various tokens supported by [encodeTransfer].
- * The format is {chain}_{symbol}
- */
-enum class Token {
-    Arbitrum_USDC,
-    Arbitrum_ARB,
-    ArbitrumSepolia_USDC,
-    Avalanche_USDC,
-    AvalancheFuji_USDC,
-    Base_USDC,
-    BaseSepolia_USDC,
-    Optimism_USDC,
-    Optimism_OP,
-    OptimismSepolia_USDC,
-    Polygon_USDC,
-    PolygonAmoy_USDC,
-    Unichain_USDC,
-    UnichainSepolia_USDC;
+object Avalanche : Chain() {
+    override val chainId: Long
+        get() = 43_114
 }
