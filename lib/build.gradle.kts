@@ -47,24 +47,28 @@ fun buildNum(): Int {
     }
 }
 
-fun majorNumber(): Int {
-    return if (project.hasProperty("MAJOR_NUMBER")) {
-        project.property("MAJOR_NUMBER").toString().toInt()
+fun versionTag(): String {
+    return if (project.hasProperty("VERSION_TAG")) {
+        project.property("VERSION_TAG").toString()
     } else {
-        extra["versionMajor"] as Int
+        "0.0.0"
     }
 }
 
-fun isInternalBuild(): Boolean {
-    return majorNumber() == 0
-
+fun isPublicRelease(): Boolean {
+    return if (project.hasProperty("IS_PUBLIC_RELEASE")) {
+        project.property("IS_PUBLIC_RELEASE").toString().toBoolean()
+    } else {
+        false
+    }
 }
 
 fun apiVersion(): String {
-    return if (isInternalBuild()) {
-        "${majorNumber()}.${extra["versionMedium"]}.${extra["versionMinorPublished"]}-${buildNum()}" // internal build's buildNum is action build number
+    val tag = versionTag().removePrefix("v") // Remove "v" prefix for Maven compatibility
+    return if (isPublicRelease()) {
+        tag // Public release: use tag version directly (e.g., "1.3.1")
     } else {
-        "${majorNumber()}.${extra["versionMedium"]}.${buildNum()}" // release build's buildNum is extracted from the git tag
+        "${tag}-${buildNum()}" // Internal build: tag + build number (e.g., "1.3.1-35")
     }
 }
 
@@ -109,7 +113,7 @@ android {
         minSdk = 28
         version = libraryVersion()
         buildConfigField("String", "version", "\"${version}\"")
-        buildConfigField("boolean", "INTERNAL_BUILD", "${isInternalBuild()}")
+        buildConfigField("boolean", "INTERNAL_BUILD", "${!isPublicRelease()}")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments += mapOf(
             "notPackage" to "com.circle.modularwallets.core.manual"
