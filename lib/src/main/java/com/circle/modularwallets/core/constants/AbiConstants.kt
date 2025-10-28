@@ -27,6 +27,7 @@ internal val CONTRACT_ADDRESS: Map<String, String> = mapOf(
     Token.Arbitrum_USDC.name to "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
     Token.Arbitrum_ARB.name to "0x912CE59144191C1204E64559FE8253a0e49E6548",
     Token.ArbitrumSepolia_USDC.name to "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+    Token.ArcTestnet_USDC.name to "0x3600000000000000000000000000000000000000",
     Token.Avalanche_USDC.name to "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
     Token.AvalancheFuji_USDC.name to "0x5425890298aed601595a70AB815c96711a31Bc65",
     Token.Base_USDC.name to "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
