@@ -39,6 +39,8 @@ internal val CONTRACT_ADDRESS: Map<String, String> = mapOf(
     Token.PolygonAmoy_USDC.name to "0x41e94eb019c0762f9bfcf9fb1e58725bfb0e7582",
     Token.Unichain_USDC.name to "0x078D782b760474a361dDA0AF3839290b0EF57AD6",
     Token.UnichainSepolia_USDC.name to "0x31d0220469e10c4E71834a79b1f276d740d3768F",
+    Token.Monad_USDC.name to "0x754704bc059f8c67012fed69bc8a327a5aafb603", // Note: MONAD mainnet USDC contract address
+    Token.MonadTestnet_USDC.name to "0x534b2f3A21130d7a60830c2Df862319e593943A3",
 )
 val CIRCLE_PLUGIN_ADD_OWNERS_ABI = """
 [

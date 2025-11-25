@@ -284,8 +284,10 @@ internal object BundlerApiImpl : BundlerApi {
             tmpUserOp.callGasLimit = BigInteger.ZERO
             tmpUserOp.preVerificationGas = BigInteger.ZERO
             if(paymaster != null){
-                tmpUserOp.paymasterVerificationGasLimit = BigInteger.ZERO
-                tmpUserOp.paymasterPostOpGasLimit = BigInteger.ZERO
+                // Preserve stub data values if available, only use ZERO as fallback
+                // This aligns with Viem's behavior: prioritize paymaster-provided gas limits
+                tmpUserOp.paymasterVerificationGasLimit = tmpUserOp.paymasterVerificationGasLimit ?: BigInteger.ZERO
+                tmpUserOp.paymasterPostOpGasLimit = tmpUserOp.paymasterPostOpGasLimit ?: BigInteger.ZERO
             } else{
                 tmpUserOp.paymasterVerificationGasLimit = null
                 tmpUserOp.paymasterPostOpGasLimit = null
