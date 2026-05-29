@@ -118,6 +118,7 @@ android {
         testInstrumentationRunnerArguments += mapOf(
             "notPackage" to "com.circle.modularwallets.core.manual"
         )
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
