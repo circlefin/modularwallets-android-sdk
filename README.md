@@ -22,7 +22,8 @@ Add the maven setting values in `local.properties` file:
 ```properties
 mwsdk.maven.url=https://maven.pkg.github.com/circlefin/modularwallets-android-sdk
 mwsdk.maven.username=<GITHUB_USERNAME>
-# Fine-grained personal access tokens or classic with package write permission.
+# Classic personal access token with `read:packages` scope — GitHub Packages Gradle registry authenticates classic PATs only (fine-grained PATs are not supported here).
+# For SSO-enforced orgs, also authorize the PAT for that org — see GitHub Packages auth docs.
 mwsdk.maven.password=<GITHUB_PAT> 
 
 ```
