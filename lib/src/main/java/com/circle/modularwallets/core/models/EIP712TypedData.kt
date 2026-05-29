@@ -22,6 +22,13 @@ import com.circle.modularwallets.core.constants.REPLAY_SAFE_HASH_V1
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
+// The Moshi @JsonClass / @Json annotations stay because the generated
+// EIP712*JsonAdapter classes are published public API surface — consumer apps
+// that use Moshi (without KotlinJsonAdapterFactory) can depend on them.
+// However, the SDK's own typed-data parser uses Jackson
+// (StructuredDataEncoder.parseJSONMessage), and that path needs consumer-side
+// R8 keep rules in lib/consumer-rules.pro.
+
 @JsonClass(generateAdapter = true)
 data class EIP712Message @JvmOverloads constructor(
     @Json(name = "types") var types: MutableMap<String, MutableList<Entry>>? = null,
@@ -36,12 +43,18 @@ data class Entry @JvmOverloads constructor(
     @Json(name = "type") var type: String? = null,
 )
 
+// All five canonical EIP712Domain fields must remain `var` — the SDK's
+// Jackson-based typed-data parser binds via JavaBean setters (no
+// jackson-module-kotlin on the classpath), so a `val` property has no setter
+// and Jackson throws UnrecognizedPropertyException for that field in any
+// minified consumer app. The structural invariant is asserted by
+// EIP712DomainParseTest.canonicalDomainFieldsExposePublicSetters.
 @JsonClass(generateAdapter = true)
 data class EIP712Domain @JvmOverloads constructor(
     @Json(name = "name") var name: String? = null,
     @Json(name = "version") var version: String? = null,
     @Json(name = "chainId") var chainId: Long? = null,
-    @Json(name = "verifyingContract") val verifyingContract: String? = null,
+    @Json(name = "verifyingContract") var verifyingContract: String? = null,
     @Json(name = "salt") var salt: String? = null,
 )
 
