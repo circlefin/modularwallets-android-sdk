@@ -41,7 +41,7 @@ data class EIP712Domain @JvmOverloads constructor(
     @Json(name = "name") var name: String? = null,
     @Json(name = "version") var version: String? = null,
     @Json(name = "chainId") var chainId: Long? = null,
-    @Json(name = "verifyingContract") val verifyingContract: String? = null,
+    @Json(name = "verifyingContract") var verifyingContract: String? = null,
     @Json(name = "salt") var salt: String? = null,
 )
 
