@@ -197,7 +197,7 @@ internal object BundlerApiImpl : BundlerApi {
         try {
             if (partialUserOp.maxFeePerGas == null || partialUserOp.maxPriorityFeePerGas == null) {
                 if (estimateFeesPerGas == null) {
-                    val defaultMaxFeePerGas = parseGwei("3")
+                    val defaultMaxFeePerGas = defaultMaxFeePerGasFor(bundlerClient.chain.chainId)
                     val defaultMaxPriorityFeePerGas = parseGwei("1")
                     val two = BigInteger.valueOf(2)
                     val fees = publicApi.estimateFeesPerGas(
@@ -358,6 +358,22 @@ internal fun getUpdatedCalls(calls: Array<EncodeCallDataArg>): Array<EncodeCallD
         return@map call.dataUpdated()
     }.toTypedArray()
     return updatedCalls
+}
+/**
+ * Chain-aware default `maxFeePerGas` floor.
+ *
+ * L2 base fees are routinely well below 1 gwei; a hard 3 gwei floor inflates the
+ * worst-case spend (`gas x maxFeePerGas`) that Gas Station policies check by
+ * ~100-500x on those chains, rejecting otherwise-trivial UserOperations.
+ * Ethereum mainnet-class chains keep the conservative L1-tuned default.
+ */
+internal fun defaultMaxFeePerGasFor(chainId: Long): BigInteger = when (chainId) {
+    8453L, 84532L,      // Base, Base Sepolia
+    42161L, 421614L,    // Arbitrum One, Arbitrum Sepolia
+    10L, 11155420L,     // Optimism, OP Sepolia
+    137L, 80002L,       // Polygon, Polygon Amoy
+        -> parseGwei("0.05")
+    else -> parseGwei("3")
 }
 internal suspend fun <T> startPolling(
     pollingInterval: Long,
